@@ -39,7 +39,7 @@ import           Network.Kademlia.Config     (KademliaConfig (..), defaultConfig
 import           Network.Kademlia.Protocol   (parse, serialize)
 import           Network.Kademlia.ReplyQueue (Reply (..), ReplyQueue (timeoutChan),
                                               ReplyRegistration, flush, register)
-import           Network.Kademlia.Types      (Command, Peer (..), Serialize (..), toPeer)
+import           Network.Kademlia.Types      (Command, Peer (..), Node (..), Signal (..), Serialize (..), toPeer)
 
 -- | A handle to a UDP socket running the Kademlia connection
 data KademliaHandle i a = KH {
@@ -131,18 +131,20 @@ startRecvProcess kh = do
         -- Read from socket
         (received, addr) <- S.recvFrom (kSock kh) 1500
         -- Try to create peer
-        peer <- toPeer addr
-        case peer of
+        maybePeer <- toPeer addr
+        case maybePeer of
             Nothing -> logError kh ("Unknown peer " ++ show addr)
             Just p  ->
                 -- Try parsing the signal
                 case parse p received of
                     Left _    ->
-                      logError kh ("Can't parse " ++ show (BS.length received) ++ " bytes from " ++ show peer)
+                      logError kh ("Can't parse " ++ show (BS.length received) ++ " bytes from " ++ show p)
                     Right sig -> do
-                        logInfo kh ("Received signal " ++ show sig ++ " from " ++ show p)
+                        -- Fix sig to use correct address behind NAT
+                        let realSig = sig { source = Node p (nodeId $ source sig) }
+                        logInfo kh ("Received signal " ++ show sig ++ " from " ++ show p ++ " fixed to " ++ show realSig)
                         -- Send the signal to the receivng process of instance
-                        writeChan (timeoutChan . replyQueue $ kh) $ Answer sig
+                        writeChan (timeoutChan . replyQueue $ kh) $ Answer realSig
                         logInfo kh (" -- added from signal " ++ show p ++ " to chan")
         )
             -- Send Closed reply to all handlers
