@@ -73,7 +73,7 @@ main = do
     print args
     let port      = read $ args !! 0
         peerIdRaw = C.pack $ args !! 1
-        peerHost  = read $ args !! 2
+        peerHost  = args !! 2
         peerPort  = read $ args !! 3
     peerId <- either (\e -> do
                          putStrLn $ "ERROR: Invalid base64 key: " ++ e
