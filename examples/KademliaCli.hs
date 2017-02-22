@@ -61,9 +61,13 @@ connectToPeer inct peer peerId = do
     let peerNode = K.Node peer . KademliaID $ peerId
     K.joinNetwork inct peerNode
 
-processCommand :: String -> IO Bool
-processCommand "exit" = return True
-processCommand s = do
+processCommand :: KademliaInstance -> String -> IO Bool
+processCommand _ "exit" = return True
+processCommand inst "peers" = do
+    peers <- K.dumpPeers inst
+    putStrLn $ show peers
+    return False
+processCommand _ s = do
     putStrLn $ "Invalid command: " ++ s
     return False
 
@@ -97,7 +101,7 @@ main = do
 
     forever $ do
         command <- getLine
-        result <- processCommand command
+        result <- processCommand kInstance command
         when result $ do
           K.close kInstance
           exitSuccess
