@@ -75,17 +75,17 @@ main :: IO ()
 main = do
     args <- getArgs
     print args
-    let port      = read $ args !! 0
-        peerIdRaw = C.pack $ args !! 1
-        peerHost  = args !! 2
-        peerPort  = read $ args !! 3
-    peerId <- either (\e -> do
-                         putStrLn $ "ERROR: Invalid base64 key: " ++ e
-                         return $ C.pack "0")
-                     return
-                     (B64.decode peerIdRaw)
-
-    ourId <- evalRandIO (generateByteString kIdLength)
+    let port        = read $ args !! 0
+        ourIdRaw    = C.pack $ args !! 1
+        peerIdRaw   = C.pack $ args !! 2
+        peerHost    = args !! 3
+        peerPort    = read $ args !! 4
+        parseId raw = either (\e -> do
+                                 putStrLn $ "ERROR: Invalid base64 key: " ++ e
+                                 evalRandIO (generateByteString kIdLength))
+                      return $ B64.decode raw
+    ourId <- parseId ourIdRaw
+    peerId <- parseId peerIdRaw
 
     putStrLn $ "Starting Kademlia, our key is: " ++ (show $ B64.encode ourId)
 
