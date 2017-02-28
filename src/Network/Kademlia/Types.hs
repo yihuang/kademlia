@@ -128,10 +128,10 @@ data Command i a = PING         Peer
                    deriving (Eq)
 
 instance Show i => Show (Command i a) where
-  show (PING          _)          = "PING"
-  show (PONG          _)          = "PONG"
-  show (STORE        i _)         = "STORE " ++ show i ++ " <data>"
-  show (FIND_NODE    _ i)         = "FIND_NODE " ++ show i
-  show (RETURN_NODES _ n i nodes) = "RETURN_NODES (one of " ++ show n ++ " messages) " ++ show i ++ " " ++ show nodes
-  show (FIND_VALUE   i)           = "FIND_VALUE " ++ show i
-  show (RETURN_VALUE i _)         = "RETURN_VALUE " ++ show i ++ " <data>"
+  show (PING          addr)          = "PING from " ++ show addr
+  show (PONG          addr)          = "PONG from " ++ show addr
+  show (STORE        i _)            = "STORE " ++ show i ++ " <data>"
+  show (FIND_NODE    addr i)         = "FIND_NODE from " ++ show addr ++ " " ++ show i
+  show (RETURN_NODES addr n i nodes) = "RETURN_NODES from " ++ show addr ++ " (one of " ++ show n ++ " messages) " ++ show i ++ " " ++ show nodes
+  show (FIND_VALUE   i)              = "FIND_VALUE " ++ show i
+  show (RETURN_VALUE i _)            = "RETURN_VALUE " ++ show i ++ " <data>"

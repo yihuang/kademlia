@@ -17,7 +17,7 @@ module Network.Kademlia.Protocol.Parsing
        , parseWord8
        ) where
 
-import           Control.Monad              (liftM, liftM2, liftM3, liftM4)
+import           Control.Monad              (liftM2)
 import           Control.Monad.State        (State, evalState, get, put)
 import           Control.Monad.Trans        (lift)
 import           Control.Monad.Trans.Except (ExceptT, catchE, runExceptT, throwE)
