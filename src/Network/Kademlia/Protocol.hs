@@ -23,31 +23,31 @@ import           Data.List                         (scanl')
 import           Data.Word                         (Word8)
 
 import           Network.Kademlia.Protocol.Parsing (parse)
-import           Network.Kademlia.Types            (Command (..), Node (..),
+import           Network.Kademlia.Types            (Command (..), Peer (..), Node (..),
                                                     Serialize (..), peerHost, peerPort)
 
 -- | Retrieve the assigned protocolId
 commandId :: Command i a -> Word8
-commandId PING                 = 0
-commandId PONG                 = 1
-commandId (STORE _ _)          = 2
-commandId (FIND_NODE _)        = 3
-commandId (RETURN_NODES _ _ _) = 4
-commandId (FIND_VALUE _)       = 5
-commandId (RETURN_VALUE _ _)   = 6
+commandId (PING _)               = 0
+commandId (PONG _)               = 1
+commandId (STORE _ _  )          = 2
+commandId (FIND_NODE _ _)        = 3
+commandId (RETURN_NODES _ _ _ _) = 4
+commandId (FIND_VALUE _)         = 5
+commandId (RETURN_VALUE _ _)     = 6
 
 -- | Turn the command arguments into a ByteString, which fits into specified size.
 -- Remaining part of command would be also returned, if any.
 serialize :: (Serialize i, Serialize a)
             => Int -> i -> Command i a -> Either String [B.ByteString]
-serialize size_ (toBS -> myId) cmd@(RETURN_NODES _ (toBS -> nid) allNodes) =
+serialize size_ (toBS -> myId) cmd@(RETURN_NODES peer _ (toBS -> nid) allNodes) =
     addPrefix <$> genPacks allNodes
   where
     addPrefix packs = map (prefix n `B.append`) packs
       where n = fromIntegral $ length packs
     prefixSize = size_ - 2 - B.length myId - B.length nid
     prefix :: Word8 -> B.ByteString
-    prefix n = (commandId cmd) `B.cons` myId `B.append` (n `B.cons` nid)
+    prefix n = serializePeer peer `B.append` (commandId cmd `B.cons` myId) `B.append` (n `B.cons` nid)
     genPacks :: Serialize i => [Node i] -> Either String [B.ByteString]
     genPacks [] = return []
     genPacks nodes =
@@ -66,21 +66,24 @@ serialize size (toBS -> myId) cmd =
   where
     res = commandArgs' cmd
     cId = commandId cmd
-    commandArgs' PING                 = B.empty
-    commandArgs' PONG                 = B.empty
-    commandArgs' (STORE k v)          = toBS k `B.append` toBS v
-    commandArgs' (FIND_NODE nid)      = toBS nid
-    commandArgs' (FIND_VALUE k)       = toBS k
-    commandArgs' (RETURN_VALUE nid v) = toBS nid `B.append` toBS v
-    commandArgs' (RETURN_NODES _ _ _) = error "Don't know what to do with this case :("
+    commandArgs' (PING peer)            = serializePeer peer
+    commandArgs' (PONG peer)            = serializePeer peer
+    commandArgs' (STORE k v)            = toBS k `B.append` toBS v
+    commandArgs' (FIND_NODE peer nid)   = serializePeer peer `B.append` toBS nid
+    commandArgs' (FIND_VALUE k)         = toBS k
+    commandArgs' (RETURN_VALUE nid v)   = toBS nid `B.append` toBS v
+    commandArgs' (RETURN_NODES _ _ _ _) = error "Don't know what to do with this case :("
+
+serializePeer :: Peer -> B.ByteString
+serializePeer peer = C.pack (peerHost peer ++ " ") `B.append` toBinary (fromIntegral $ peerPort peer)
+  where
+    -- Converts a Word16 into a two character ByteString
+    toBinary = B.concat . L.toChunks . toLazyByteString . word16BE
 
 nodeToArg :: (Serialize i) => Node i -> B.ByteString
-nodeToArg node = nid `B.append` C.pack (host ++ " ") `B.append` port
+nodeToArg node = nid `B.append` p
     where nid = toBS . nodeId $ node
-          host = peerHost . peer $ node
-          port = toBinary . fromIntegral . peerPort . peer $ node
-          -- Converts a Word16 into a two character ByteString
-          toBinary = B.concat . L.toChunks . toLazyByteString . word16BE
+          p = serializePeer $ peer node
 --
 ---- | Turn a command into a sendable ByteStrings, which fit into specified size.
 ---- TODO: preserve lazy evaluation of result list.

@@ -17,7 +17,7 @@ module Network.Kademlia.Protocol.Parsing
        , parseWord8
        ) where
 
-import           Control.Monad              (liftM, liftM2, liftM3)
+import           Control.Monad              (liftM, liftM2, liftM3, liftM4)
 import           Control.Monad.State        (State, evalState, get, put)
 import           Control.Monad.Trans        (lift)
 import           Control.Monad.Trans.Except (ExceptT, catchE, runExceptT, throwE)
@@ -102,14 +102,19 @@ parseWord16 = do
         toWord16 :: Word8 -> Word16
         toWord16 = fromIntegral
 
+-- | Parses a Peer's info
+parsePeer :: Parse Peer
+parsePeer = do
+    host <- parseSplit ' '
+    skipCharacter
+    port <- parseWord16
+    return $ Peer (C.unpack host) (fromIntegral port)
+
 -- | Parses a Node's info
 parseNode :: (Serialize i) => Parse (Node i)
 parseNode = do
     nid <- parseSerialize
-    host <- parseSplit ' '
-    skipCharacter
-    port <- parseWord16
-    let peer = Peer (C.unpack host) (fromIntegral port)
+    peer <- parsePeer
     return $ Node peer nid
 
 -- | Parses a trailing k-bucket
@@ -119,11 +124,11 @@ parseKBucket = liftM2 (:) parseNode parseKBucket
 
 -- | Parses the rest of a command corresponding to an id
 parseCommand :: (Serialize i, Serialize a) => Word8 -> Parse (Command i a)
-parseCommand 0 = return PING
-parseCommand 1 = return PONG
-parseCommand 2 = liftM2 STORE parseSerialize parseSerialize
-parseCommand 3 = FIND_NODE `liftM` parseSerialize
-parseCommand 4 = liftM3 RETURN_NODES parseWord8 parseSerialize parseKBucket
-parseCommand 5 = FIND_VALUE `liftM` parseSerialize
-parseCommand 6 = liftM2 RETURN_VALUE parseSerialize parseSerialize
+parseCommand 0 = PING <$> parsePeer
+parseCommand 1 = PONG <$> parsePeer
+parseCommand 2 = STORE <$> parseSerialize <*> parseSerialize
+parseCommand 3 = FIND_NODE <$> parsePeer <*> parseSerialize
+parseCommand 4 = RETURN_NODES <$> parsePeer <*> parseWord8 <*> parseSerialize <*> parseKBucket
+parseCommand 5 = FIND_VALUE <$> parseSerialize
+parseCommand 6 = RETURN_VALUE <$> parseSerialize <*> parseSerialize
 parseCommand _ = throwE "Invalid id"

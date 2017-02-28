@@ -35,7 +35,7 @@ import           Network.Kademlia.Instance   (KademliaInstance (..), KademliaSta
 import           Network.Kademlia.Networking (expect, send)
 import           Network.Kademlia.ReplyQueue hiding (logError, logInfo)
 import qualified Network.Kademlia.Tree       as T
-import           Network.Kademlia.Types      (Command (..), Node (..), Serialize (..),
+import           Network.Kademlia.Types      (Command (..), Peer (..), Node (..), Serialize (..),
                                               Signal (..), sortByDistanceTo)
 
 
@@ -74,7 +74,7 @@ lookup inst nid = runLookup go inst nid
 
           -- When receiving a RETURN_NODES command, throw the nodes into the
           -- lookup loop and continue the lookup
-          checkSignal (Signal _ (RETURN_NODES _ _ nodes)) =
+          checkSignal (Signal _ (RETURN_NODES _ _ _ nodes)) =
                 continueLookup nodes sendS continue cancel
           checkSignal _ = error "Fundamental error in unhandled query @lookup@"
 
@@ -103,7 +103,7 @@ store inst key val = runLookup go inst key
     where go = startLookup (config inst) sendS end checkSignal
 
           -- Always add the nodes into the loop and continue the lookup
-          checkSignal (Signal _ (RETURN_NODES _ _ nodes)) =
+          checkSignal (Signal _ (RETURN_NODES _ _ _ nodes)) =
                 continueLookup nodes sendS continue end
           checkSignal _ = error "Meet unknown signal in store"
 
@@ -112,7 +112,8 @@ store inst key val = runLookup go inst key
 
           -- Send a FIND_NODE command, looking for the node corresponding to the
           -- key
-          sendS = sendSignal (FIND_NODE key)
+          -- TODO(voit): Specify OUR addr
+          sendS = sendSignal (FIND_NODE (Peer "" 0)key)
 
           -- Run the lookup as long as possible, to make sure the nodes closest
           -- to the key were polled.
@@ -163,7 +164,7 @@ joinNetwork inst node = ownId >>= runLookup go inst
             (atomically . readTVar .  sTree . state $ inst)
 
           -- Also insert all returned nodes to our bucket (see [CSL-258])
-          checkSignal (Signal _ (RETURN_NODES _ _ nodes)) = do
+          checkSignal (Signal _ (RETURN_NODES _ _ _ nodes)) = do
                 -- Check whether the own id was encountered. If so, return a IDClash
                 -- error, otherwise, continue the lookup.
                 -- Commented out due to possibility of bug (like when node reconnects)
@@ -179,7 +180,8 @@ joinNetwork inst node = ownId >>= runLookup go inst
           continue = waitForReply finish checkSignal
 
           -- Send a FIND_NODE command, looking up your own id
-          sendS sendNode = liftIO ownId >>= flip sendSignal sendNode . FIND_NODE
+          -- TODO(voit): specify OUR addr
+          sendS sendNode = liftIO ownId >>= flip sendSignal sendNode . FIND_NODE (Peer "" 0)
 
           -- Return a success, when the operation finished cleanly
           finish = return JoinSuccess
@@ -204,7 +206,7 @@ lookupNode inst nid = runLookup go inst nid
     -- * otherwise: return found node
     -- Also insert all returned nodes to our tree (see [CSL-258])
     checkSignal :: Signal i v -> LookupM i a (Maybe (Node i))
-    checkSignal (Signal _ (RETURN_NODES _ _ nodes)) = do
+    checkSignal (Signal _ (RETURN_NODES _ _ _ nodes)) = do
         let targetNode = find ((== nid) . nodeId) nodes
         case targetNode of
             Nothing  -> continueLookup nodes sendS continue end
@@ -217,7 +219,8 @@ lookupNode inst nid = runLookup go inst nid
 
     -- Send a FIND_NODE command looking for the Node corresponding to the id
     sendS :: Node i -> LookupM i a ()
-    sendS = sendSignal (FIND_NODE nid)
+    -- TODO(voit): Specify OUR addr
+    sendS = sendSignal (FIND_NODE (Peer "" 0) nid)
 
 -- | The state of a lookup
 data LookupState i a = LookupState
@@ -288,7 +291,7 @@ waitForReply cancel onSignal = do
                     liftIO . insertNode inst $ node
 
                     case cmd of
-                      RETURN_NODES n nid _ -> do
+                      RETURN_NODES _ n nid _ -> do
                         toRemove <- maybe True ((>= n) . (+1)) <$> gets (M.lookup node . pending)
                         if toRemove
                            then removeFromPending node
@@ -412,7 +415,7 @@ sendSignal cmd node = do
 
     -- Determine the appropriate ReplyRegistrations to the command
     where regs = case cmd of
-                    (FIND_NODE nid)  -> RR [R_RETURN_NODES nid] (nodeId node)
+                    (FIND_NODE _ nid)  -> RR [R_RETURN_NODES nid] (nodeId node)
                     (FIND_VALUE nid) ->
                         RR [R_RETURN_NODES nid, R_RETURN_VALUE nid] (nodeId node)
                     _               -> error "Unknown command at @sendSignal@"

@@ -118,20 +118,20 @@ data Signal i v = Signal {
     } deriving (Show, Eq)
 
 -- | Representations of the different protocol commands
-data Command i a = PING
-                 | PONG
+data Command i a = PING         Peer
+                 | PONG         Peer
                  | STORE        i a
-                 | FIND_NODE    i
-                 | RETURN_NODES Word8 i [Node i]
+                 | FIND_NODE    Peer i
+                 | RETURN_NODES Peer Word8 i [Node i]
                  | FIND_VALUE   i
                  | RETURN_VALUE i a
                    deriving (Eq)
 
 instance Show i => Show (Command i a) where
-  show PING                   = "PING"
-  show PONG                   = "PONG"
-  show (STORE        i _)     = "STORE " ++ show i ++ " <data>"
-  show (FIND_NODE    i)       = "FIND_NODE " ++ show i
-  show (RETURN_NODES n i nodes) = "RETURN_NODES (one of " ++ show n ++ " messages) " ++ show i ++ " " ++ show nodes
-  show (FIND_VALUE   i)       = "FIND_VALUE " ++ show i
-  show (RETURN_VALUE i _)     = "RETURN_VALUE " ++ show i ++ " <data>"
+  show (PING          _)          = "PING"
+  show (PONG          _)          = "PONG"
+  show (STORE        i _)         = "STORE " ++ show i ++ " <data>"
+  show (FIND_NODE    _ i)         = "FIND_NODE " ++ show i
+  show (RETURN_NODES _ n i nodes) = "RETURN_NODES (one of " ++ show n ++ " messages) " ++ show i ++ " " ++ show nodes
+  show (FIND_VALUE   i)           = "FIND_VALUE " ++ show i
+  show (RETURN_VALUE i _)         = "RETURN_VALUE " ++ show i ++ " <data>"
