@@ -28,7 +28,7 @@ import           Control.Exception           (SomeException, catch, finally)
 import           Control.Monad               (forM_, forever, unless, void)
 import qualified Data.ByteString             as BS
 import           Data.List                   (intersperse)
-import           Network.Socket              (AddrInfo (..), AddrInfoFlag (AI_PASSIVE),
+import           Network.Socket              (PortNumber, AddrInfo (..), AddrInfoFlag (AI_PASSIVE),
                                               Socket, SockAddr (..), SocketOption (ReuseAddr),
                                               SocketType (Datagram), addrAddress, connect,
                                               addrFlags, bind, close, defaultHints,
@@ -81,12 +81,12 @@ openOnL port id' lim rq logInfo logError = withSocketsDo $ do
     -- TODO: support IPV6 by binding to two sockets
     let serveraddr = head $ filter (\a -> addrFamily a == AF_INET) serveraddrs
 
+    ourAddress <- guessOurIP serveraddr $ read port
+
     -- Create socket and bind to it
     sock <- socket (addrFamily serveraddr) Datagram defaultProtocol
     setSocketOption sock ReuseAddr 1
     bind sock (addrAddress serveraddr)
-
-    ourAddress <- guessOurIP serveraddr
 
     chan <- newChan
     tId <- forkIO $ sendProcessL sock lim id' chan logInfo logError
@@ -96,8 +96,8 @@ openOnL port id' lim rq logInfo logError = withSocketsDo $ do
     return $ KH sock ourAddress tId chan rq mvar logInfo logError
 
 -- | Try to guess our external IP address using connection to some global host
-guessOurIP :: AddrInfo -> IO Peer
-guessOurIP serverAddr = do
+guessOurIP :: AddrInfo -> PortNumber -> IO Peer
+guessOurIP serverAddr port = do
     sock <- socket (addrFamily serverAddr) Datagram defaultProtocol
     setSocketOption sock ReuseAddr 1
     let peerAddr = SockAddrInet 53 $ tupleToHostAddress (8, 8, 8, 8)
@@ -107,7 +107,7 @@ guessOurIP serverAddr = do
 
     let tupleToString (a, b, c, d) = concat . intersperse "." $ map show [a, b, c, d]
     return $ case ourSockAddr of
-          SockAddrInet p host -> Peer (tupleToString $ hostAddressToTuple host) p
+          SockAddrInet _ host -> Peer (tupleToString $ hostAddressToTuple host) port
           _ -> Peer "0.0.0.0" 0
 
 
