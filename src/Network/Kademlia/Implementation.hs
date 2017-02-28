@@ -32,10 +32,10 @@ import           Data.Word                   (Word8)
 import           Network.Kademlia.Config     (KademliaConfig (..), usingConfig)
 import           Network.Kademlia.Instance   (KademliaInstance (..), KademliaState (..),
                                               insertNode, isNodeBanned)
-import           Network.Kademlia.Networking (expect, send)
+import           Network.Kademlia.Networking (ourAddr, expect, send)
 import           Network.Kademlia.ReplyQueue hiding (logError, logInfo)
 import qualified Network.Kademlia.Tree       as T
-import           Network.Kademlia.Types      (Command (..), Peer (..), Node (..), Serialize (..),
+import           Network.Kademlia.Types      (Command (..), Node (..), Serialize (..),
                                               Signal (..), sortByDistanceTo)
 
 
@@ -112,8 +112,7 @@ store inst key val = runLookup go inst key
 
           -- Send a FIND_NODE command, looking for the node corresponding to the
           -- key
-          -- TODO(voit): Specify OUR addr
-          sendS = sendSignal (FIND_NODE (Peer "" 0)key)
+          sendS = sendSignal (FIND_NODE (ourAddr $ handle inst) key)
 
           -- Run the lookup as long as possible, to make sure the nodes closest
           -- to the key were polled.
@@ -180,8 +179,7 @@ joinNetwork inst node = ownId >>= runLookup go inst
           continue = waitForReply finish checkSignal
 
           -- Send a FIND_NODE command, looking up your own id
-          -- TODO(voit): specify OUR addr
-          sendS sendNode = liftIO ownId >>= flip sendSignal sendNode . FIND_NODE (Peer "" 0)
+          sendS sendNode = liftIO ownId >>= flip sendSignal sendNode . FIND_NODE (ourAddr $ handle inst)
 
           -- Return a success, when the operation finished cleanly
           finish = return JoinSuccess
@@ -219,8 +217,7 @@ lookupNode inst nid = runLookup go inst nid
 
     -- Send a FIND_NODE command looking for the Node corresponding to the id
     sendS :: Node i -> LookupM i a ()
-    -- TODO(voit): Specify OUR addr
-    sendS = sendSignal (FIND_NODE (Peer "" 0) nid)
+    sendS = sendSignal (FIND_NODE (ourAddr $ handle inst) nid)
 
 -- | The state of a lookup
 data LookupState i a = LookupState

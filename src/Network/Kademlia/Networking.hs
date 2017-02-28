@@ -9,6 +9,7 @@ Network.Kademlia.Networking implements all the UDP network functionality.
 
 module Network.Kademlia.Networking
        ( KademliaHandle
+       , ourAddr
        , openOn
        , openOnL
        , startRecvProcess
@@ -26,12 +27,15 @@ import           Control.Concurrent          (Chan, MVar, ThreadId, forkIO, isEm
 import           Control.Exception           (SomeException, catch, finally)
 import           Control.Monad               (forM_, forever, unless, void)
 import qualified Data.ByteString             as BS
+import           Data.List                   (intersperse)
 import           Network.Socket              (AddrInfo (..), AddrInfoFlag (AI_PASSIVE),
-                                              Socket, SocketOption (ReuseAddr),
-                                              SocketType (Datagram), addrAddress,
+                                              Socket, SockAddr (..), SocketOption (ReuseAddr),
+                                              SocketType (Datagram), addrAddress, connect,
                                               addrFlags, bind, close, defaultHints,
                                               defaultProtocol, getAddrInfo, Family(..),
-                                              setSocketOption, socket, withSocketsDo)
+                                              setSocketOption, socket, withSocketsDo,
+                                              tupleToHostAddress, getSocketName,
+                                              hostAddressToTuple)
 import qualified Network.Socket.ByteString   as S
 import           System.IO.Error             (ioError, userError)
 
@@ -44,6 +48,7 @@ import           Network.Kademlia.Types      (Command, Peer (..), Serialize (..)
 -- | A handle to a UDP socket running the Kademlia connection
 data KademliaHandle i a = KH {
       kSock      :: Socket
+    , ourAddr    :: Peer
     , sendThread :: ThreadId
     , sendChan   :: Chan (Command i a, Peer)
     , replyQueue :: ReplyQueue i a
@@ -81,12 +86,30 @@ openOnL port id' lim rq logInfo logError = withSocketsDo $ do
     setSocketOption sock ReuseAddr 1
     bind sock (addrAddress serveraddr)
 
+    ourAddress <- guessOurIP serveraddr
+
     chan <- newChan
     tId <- forkIO $ sendProcessL sock lim id' chan logInfo logError
     mvar <- newEmptyMVar
 
     -- Return the handle
-    return $ KH sock tId chan rq mvar logInfo logError
+    return $ KH sock ourAddress tId chan rq mvar logInfo logError
+
+-- | Try to guess our external IP address using connection to some global host
+guessOurIP :: AddrInfo -> IO Peer
+guessOurIP serverAddr = do
+    sock <- socket (addrFamily serverAddr) Datagram defaultProtocol
+    setSocketOption sock ReuseAddr 1
+    let peerAddr = SockAddrInet 53 $ tupleToHostAddress (8, 8, 8, 8)
+    connect sock peerAddr
+    ourSockAddr <- getSocketName sock
+    close sock
+
+    let tupleToString (a, b, c, d) = concat . intersperse "." $ map show [a, b, c, d]
+    return $ case ourSockAddr of
+          SockAddrInet p host -> Peer (tupleToString $ hostAddressToTuple host) p
+          _ -> Peer "0.0.0.0" 0
+
 
 sendProcessL
     :: (Show i, Serialize i, Serialize a)

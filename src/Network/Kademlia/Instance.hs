@@ -206,8 +206,7 @@ receivingProcess inst@(KI h _ _ cfg) rq = forever . (`catch` logError' h) $ do
                         Nothing -> return ()
                         Just node -> do
                             -- Ping the node
-                            -- TODO(voit): Specify OUR address as second peer
-                            send h (peer node) (PING (peer node))
+                            send h (peer node) (PING . ourAddr $ handle inst)
                             expect h newRegistration $ defaultChan rq
 
         -- Store values in newly encountered nodes that you are the closest to
@@ -296,8 +295,7 @@ pingProcess (KI h (KS sTree _ _) _ cfg) chan = forever . (`catch` logError' h) $
     tree <- atomically . readTVar $ sTree
     forM_ (T.toList tree) $ \node -> do
         -- Send PING and expect a PONG
-        -- TODO(voit): Specify OUR address as the second peer
-        send h (peer node) (PING (peer node))
+        send h (peer node) (PING $ ourAddr h)
         expect h (RR [R_PONG] (nodeId node)) $ chan
 
 -- | Store all values stored in the node in the 'k' closest known nodes every hour
@@ -343,11 +341,11 @@ expirationProcess inst@(KI _ _ valueTs cfg) key = do
 handleCommand :: (Serialize i, Ord i) =>
     Command i a -> Peer -> KademliaInstance i a -> IO ()
 -- Simply answer a PING with a PONG
--- TODO(voit): Specify OUR address as the second peer
-handleCommand (PING addr) peer inst = send (handle inst) peer (PONG addr)
+-- TODO(voit): Use addr
+handleCommand (PING _addr) peer inst = send (handle inst) peer (PONG . ourAddr $ handle inst)
 -- Return a KBucket with the closest Nodes
--- TODO(voit): Specify OUR address as the first peer
-handleCommand (FIND_NODE addr nid) peer inst = returnNodes addr peer nid inst
+-- TODO(voit): Use addr
+handleCommand (FIND_NODE _addr nid) peer inst = returnNodes peer nid inst
 -- Insert the value into the values store and start the expiration process
 handleCommand (STORE key value) _ inst = do
     insertValue key value inst
@@ -357,20 +355,19 @@ handleCommand (FIND_VALUE key) peer inst = do
     result <- lookupValue key inst
     case result of
         Just value -> liftIO $ send (handle inst) peer $ RETURN_VALUE key value
--- TODO(voit): Specify OUR address as the second peer
-        Nothing    -> returnNodes peer peer key inst
+        Nothing    -> returnNodes peer key inst
 handleCommand _ _ _ = return ()
 
 -- | Return a KBucket with the closest Nodes to a supplied Id
 returnNodes :: (Serialize i, Ord i) =>
-    Peer -> Peer -> i -> KademliaInstance i a -> IO ()
-returnNodes addr peer nid (KI h (KS sTree _ _) _ cfg@KademliaConfig {..}) = do
+    Peer -> i -> KademliaInstance i a -> IO ()
+returnNodes peer nid inst@(KI h (KS sTree _ _) _ cfg@KademliaConfig {..}) = do
     tree           <- atomically . readTVar $ sTree
     rndGen         <- newStdGen
     let closest     = T.findClosest tree nid k `usingConfig` cfg
     let randomNodes = T.pickupRandom tree routingSharingN closest rndGen
     let nodes       = closest ++ randomNodes
-    liftIO $ send h peer (RETURN_NODES addr 1 nid nodes)
+    liftIO $ send h peer (RETURN_NODES (ourAddr $ handle inst) 1 nid nodes)
 
 -- | Take a current view of `KademliaState`.
 takeSnapshot' :: KademliaState i a -> IO (KademliaSnapshot i)
