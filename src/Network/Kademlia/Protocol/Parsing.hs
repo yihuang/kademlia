@@ -26,8 +26,8 @@ import qualified Data.ByteString            as B
 import qualified Data.ByteString.Char8      as C
 import           Data.Word                  (Word16, Word8)
 
-import           Network.Kademlia.Types     (Command (..), Node (..), Peer (..),
-                                             Serialize (..), Signal (..))
+import           Network.Kademlia.Types     (Addressing (..), Command (..), Node (..),
+                                             Peer (..), Serialize (..), Signal (..))
 
 type Parse = ExceptT String (State B.ByteString)
 
@@ -42,9 +42,18 @@ parseSignal :: (Serialize i, Serialize a) => Peer -> Parse (Signal i a)
 parseSignal peer = do
     cId <- parseWord8
     nid <- parseSerialize
+    addr <- parseAddressing
     cmd <- parseCommand cId
     let node = Node peer nid
-    return $ Signal node cmd
+    return $ Signal node cmd addr
+
+parseAddressing :: Parse Addressing
+parseAddressing = do
+    w8 <- parseWord8
+    case w8 of
+        0 -> pure $ Addressing False
+        1 -> pure $ Addressing True
+        _ -> throwE "Invalid addressing"
 
 -- | Parses a Serialize
 parseSerialize :: (Serialize a) => Parse a

@@ -35,8 +35,9 @@ import           Network.Kademlia.Instance   (KademliaInstance (..), KademliaSta
 import           Network.Kademlia.Networking (expect, send)
 import           Network.Kademlia.ReplyQueue hiding (logError, logInfo)
 import qualified Network.Kademlia.Tree       as T
-import           Network.Kademlia.Types      (Command (..), Node (..), Serialize (..),
-                                              Signal (..), sortByDistanceTo)
+import           Network.Kademlia.Types      (Addressing (..), Command (..), Node (..),
+                                              Serialize (..), Signal (..),
+                                              sortByDistanceTo)
 
 
 -- | Lookup the value corresponding to a key in the DHT and return it, together
@@ -52,7 +53,7 @@ lookup inst nid = runLookup go inst nid
           -- When receiving a RETURN_VALUE command, finish the lookup, then
           -- cache the value in the closest peer that didn't return it and
           -- finally return the value
-          checkSignal (Signal origin (RETURN_VALUE _ value)) = do
+          checkSignal (Signal origin (RETURN_VALUE _ value) _) = do
                 -- Abuse the known list for saving the peers that are *known* to
                 -- store the value
                 modify $ \s -> s { known = [origin] }
@@ -74,7 +75,7 @@ lookup inst nid = runLookup go inst nid
 
           -- When receiving a RETURN_NODES command, throw the nodes into the
           -- lookup loop and continue the lookup
-          checkSignal (Signal _ (RETURN_NODES _ _ nodes)) =
+          checkSignal (Signal _ (RETURN_NODES _ _ nodes) _) =
                 continueLookup nodes sendS continue cancel
           checkSignal _ = error "Fundamental error in unhandled query @lookup@"
 
@@ -90,7 +91,7 @@ lookup inst nid = runLookup go inst nid
                 unless (null pending) $ waitForReply (return ()) finishCheck
 
           -- Record the nodes which return the value
-          finishCheck (Signal origin (RETURN_VALUE _ _)) = do
+          finishCheck (Signal origin (RETURN_VALUE _ _) _) = do
                 known <- gets known
                 modify $ \s -> s { known = origin:known }
                 finish
@@ -103,7 +104,7 @@ store inst key val = runLookup go inst key
     where go = startLookup (config inst) sendS end checkSignal
 
           -- Always add the nodes into the loop and continue the lookup
-          checkSignal (Signal _ (RETURN_NODES _ _ nodes)) =
+          checkSignal (Signal _ (RETURN_NODES _ _ nodes) _) =
                 continueLookup nodes sendS continue end
           checkSignal _ = error "Meet unknown signal in store"
 
@@ -164,7 +165,7 @@ joinNetwork inst node = ownId >>= runLookup go inst
             (atomically . readTVar .  sTree . state $ inst)
 
           -- Also insert all returned nodes to our bucket (see [CSL-258])
-          checkSignal (Signal _ (RETURN_NODES _ _ nodes)) = do
+          checkSignal (Signal _ (RETURN_NODES _ _ nodes) _) = do
                 -- Check whether the own id was encountered. If so, return a IDClash
                 -- error, otherwise, continue the lookup.
                 -- Commented out due to possibility of bug (like when node reconnects)
@@ -205,7 +206,7 @@ lookupNode inst nid = runLookup go inst nid
     -- * otherwise: return found node
     -- Also insert all returned nodes to our tree (see [CSL-258])
     checkSignal :: Signal i v -> LookupM i a (Maybe (Node i))
-    checkSignal (Signal _ (RETURN_NODES _ _ nodes)) = do
+    checkSignal (Signal _ (RETURN_NODES _ _ nodes) _) = do
         let targetNode = find ((== nid) . nodeId) nodes
         case targetNode of
             Nothing  -> continueLookup nodes sendS continue end
@@ -277,7 +278,7 @@ waitForReply cancel onSignal = do
     result <- liftIO . readChan $ chan
     case result of
         -- If there was a reply
-        Answer sig@(Signal node cmd) -> do
+        Answer sig@(Signal node cmd (Addressing behindNat)) -> do
             banned <- liftIO $ isNodeBanned inst $ nodeId node
 
             if banned
@@ -286,7 +287,7 @@ waitForReply cancel onSignal = do
                 else do
                     -- Insert the node into the tree, as it might be a new one or it
                     -- would have to be refreshed
-                    liftIO . insertNode inst $ node
+                    liftIO . unless behindNat . insertNode inst $ node
 
                     case cmd of
                       RETURN_NODES n nid _ -> do

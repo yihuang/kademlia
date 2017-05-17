@@ -1,11 +1,11 @@
 import           Control.Arrow             (first)
 import           Control.Monad             (when)
-import           Control.Monad.Random      (Rand, RandomGen, evalRand,
-                                            getRandom, evalRandIO)
+import           Control.Monad.Random      (Rand, RandomGen, evalRand, evalRandIO,
+                                            getRandom)
 import           Control.Monad.Trans       (lift)
 import qualified Control.Monad.Trans.State as S
-import           Data.Binary               (Binary (..), decodeOrFail, encode,
-                                            getWord8, putWord8)
+import           Data.Binary               (Binary (..), decodeOrFail, encode, getWord8,
+                                            putWord8)
 import qualified Data.ByteString           as B
 import qualified Data.ByteString.Char8     as C
 import           Data.ByteString.Lazy      (fromStrict, toStrict)
@@ -154,7 +154,7 @@ main = do
 
     putStrLn $ "peerIndex " ++ show peerIndex
     putStrLn $ "peerPort " ++ show peerPort
-    kInstance <- K.createL "127.0.0.1" port (KademliaID key) config logInfo logError
+    kInstance <- K.createL "127.0.0.1" port (KademliaID key) (K.Addressing False) config logInfo logError
     when (peerPort /= 0) $ do
         putStrLn "Connecting to peer"
         r <- connectToPeer kInstance peerPort peerKey

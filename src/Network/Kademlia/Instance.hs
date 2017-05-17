@@ -54,9 +54,9 @@ import           Network.Kademlia.ReplyQueue (Reply (..), ReplyQueue (timeoutCha
                                               ReplyRegistration (..), ReplyType (..),
                                               defaultChan, dispatch, expectedReply)
 import qualified Network.Kademlia.Tree       as T
-import           Network.Kademlia.Types      (Command (..), Node (..), Peer (..),
-                                              Serialize (..), Signal (..), Timestamp,
-                                              sortByDistanceTo)
+import           Network.Kademlia.Types      (Addressing (..), Command (..), Node (..),
+                                              Peer (..), Serialize (..), Signal (..),
+                                              Timestamp, sortByDistanceTo)
 import           Network.Kademlia.Utils      (threadDelay)
 import           Network.Socket              (SockAddr (..), getSocketName, inet_ntoa)
 import           System.Random               (newStdGen)
@@ -210,10 +210,10 @@ receivingProcess inst@(KI _ h _ _ _) = forever . (`catch` logError' h) $ do
         receivingProcessDo inst reply rq
   where
     isResponse :: Reply i a -> Bool
-    isResponse (Answer (Signal _ PONG))                 = True
-    isResponse (Answer (Signal _ (RETURN_VALUE _ _)))   = True
-    isResponse (Answer (Signal _ (RETURN_NODES _ _ _))) = True
-    isResponse _                                        = False
+    isResponse (Answer (Signal _ PONG _))                 = True
+    isResponse (Answer (Signal _ (RETURN_VALUE _ _) _))   = True
+    isResponse (Answer (Signal _ (RETURN_NODES _ _ _) _)) = True
+    isResponse _                                          = False
 
 
 receivingProcessDo
@@ -243,7 +243,7 @@ receivingProcessDo inst@(KI _ h _ _ cfg) reply rq = do
             dispatch reply rq -- remove node from ReplyQueue in the last time
 
         -- Store values in newly encountered nodes that you are the closest to
-        Answer (Signal node _) -> do
+        Answer (Signal node _ _) -> do
             let originId = nodeId node
 
             -- If peer is banned, ignore
@@ -281,7 +281,7 @@ backgroundProcess inst@(KI _ h _ _ _) chan threadIds = do
     logInfo h $ "Register chan: reply " ++ show reply
 
     case reply of
-        Answer sig@(Signal (Node _ nid) _) -> do
+        Answer sig@(Signal (Node _ nid) _ _) -> do
             unlessM (isNodeBanned inst nid) $ do
                 handleAnswer sig `catch` logError' h
                 repeatBP
@@ -296,14 +296,14 @@ backgroundProcess inst@(KI _ h _ _ _) chan threadIds = do
         _ -> logInfo h "-- unknown reply" >> repeatBP
   where
     repeatBP = backgroundProcess inst chan threadIds
-    handleAnswer sig@(Signal (Node _ nid) _) =
+    handleAnswer sig@(Signal (Node _ nid) _ (Addressing behindNat)) =
         unlessM (isNodeBanned inst nid) $ do
             let node = source sig
             -- Handle the signal
             handleCommand (command sig) (peer node) inst
             -- Insert the node into the tree, if it's already known, it will
             -- be refreshed
-            insertNode inst node
+            unless behindNat $ insertNode inst node
 
 -- | Ping all known nodes every five minutes to make sure they are still present
 pingProcess :: KademliaInstance i a

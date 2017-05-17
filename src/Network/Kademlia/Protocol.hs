@@ -23,8 +23,9 @@ import           Data.List                         (scanl')
 import           Data.Word                         (Word8)
 
 import           Network.Kademlia.Protocol.Parsing (parse)
-import           Network.Kademlia.Types            (Command (..), Node (..),
-                                                    Serialize (..), peerHost, peerPort)
+import           Network.Kademlia.Types            (Addressing (..), Command (..),
+                                                    Node (..), Serialize (..), peerHost,
+                                                    peerPort)
 
 -- | Retrieve the assigned protocolId
 commandId :: Command i a -> Word8
@@ -38,16 +39,27 @@ commandId (RETURN_VALUE _ _)   = 6
 
 -- | Turn the command arguments into a ByteString, which fits into specified size.
 -- Remaining part of command would be also returned, if any.
-serialize :: (Serialize i, Serialize a)
-            => Int -> i -> Command i a -> Either String [B.ByteString]
-serialize size_ (toBS -> myId) cmd@(RETURN_NODES _ (toBS -> nid) allNodes) =
+serialize
+    :: (Serialize i, Serialize a)
+    => Int
+    -> i
+    -> Command i a
+    -> Addressing
+    -> Either String [B.ByteString]
+serialize size_ (toBS -> myId) cmd@(RETURN_NODES _ (toBS -> nid) allNodes) addressing =
     addPrefix <$> genPacks allNodes
   where
-    addPrefix packs = map (prefix n `B.append`) packs
-      where n = fromIntegral $ length packs
+    saddr = serAddressing addressing
+    addPrefix :: [B.ByteString] -> [B.ByteString]
+    addPrefix packs =
+        let n = fromIntegral (length packs)
+        in map (prefix n `B.append`) packs
+
     prefixSize = size_ - 2 - B.length myId - B.length nid
+
     prefix :: Word8 -> B.ByteString
-    prefix n = (commandId cmd) `B.cons` myId `B.append` (n `B.cons` nid)
+    prefix n = (commandId cmd) `B.cons` myId `B.append` saddr `B.append` (n `B.cons` nid)
+
     genPacks :: Serialize i => [Node i] -> Either String [B.ByteString]
     genPacks [] = return []
     genPacks nodes =
@@ -59,13 +71,13 @@ serialize size_ (toBS -> myId) cmd@(RETURN_NODES _ (toBS -> nid) allNodes) =
                 throwError "No nodes fit on RETURN_NODES serialization"
             (:) pack <$> genPacks (drop argsFitNum nodes)
 
-serialize size (toBS -> myId) cmd =
-    if B.length res + 1 + B.length myId > size
+serialize size (toBS -> myId) cmd addressing =
+    if B.length res + 1 + B.length myId + B.length saddr > size
         then throwError "Size exceeded"
-        else return $ [cId `B.cons` myId `B.append` res]
+        else return $ [(commandId cmd) `B.cons` myId `B.append` saddr `B.append` res]
   where
+    saddr = serAddressing addressing
     res = commandArgs' cmd
-    cId = commandId cmd
     commandArgs' PING                 = B.empty
     commandArgs' PONG                 = B.empty
     commandArgs' (STORE k v)          = toBS k `B.append` toBS v
@@ -73,6 +85,10 @@ serialize size (toBS -> myId) cmd =
     commandArgs' (FIND_VALUE k)       = toBS k
     commandArgs' (RETURN_VALUE nid v) = toBS nid `B.append` toBS v
     commandArgs' (RETURN_NODES _ _ _) = error "Don't know what to do with this case :("
+
+serAddressing :: Addressing -> B.ByteString
+serAddressing (Addressing False) = 0 `B.cons` B.empty
+serAddressing (Addressing _)     = 1 `B.cons` B.empty
 
 nodeToArg :: (Serialize i) => Node i -> B.ByteString
 nodeToArg node = nid `B.append` C.pack (host ++ " ") `B.append` port

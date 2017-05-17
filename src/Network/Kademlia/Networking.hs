@@ -29,10 +29,11 @@ import           Control.Exception           (SomeException, catch, finally)
 import           Control.Monad               (forM_, forever, unless, void)
 import qualified Data.ByteString             as BS
 import           Network.Socket              (AddrInfo (..), AddrInfoFlag (AI_PASSIVE),
-                                              Socket, SocketOption (ReuseAddr),
+                                              Family (..), Socket,
+                                              SocketOption (ReuseAddr),
                                               SocketType (Datagram), addrAddress,
                                               addrFlags, bind, close, defaultHints,
-                                              defaultProtocol, getAddrInfo, Family(..),
+                                              defaultProtocol, getAddrInfo,
                                               setSocketOption, socket, withSocketsDo)
 import qualified Network.Socket.ByteString   as S
 import           System.IO.Error             (ioError, userError)
@@ -41,7 +42,8 @@ import           Network.Kademlia.Config     (KademliaConfig (..), defaultConfig
 import           Network.Kademlia.Protocol   (parse, serialize)
 import           Network.Kademlia.ReplyQueue (Reply (..), ReplyQueue (timeoutChan),
                                               ReplyRegistration, flush, register)
-import           Network.Kademlia.Types      (Command, Peer (..), Serialize (..), toPeer)
+import           Network.Kademlia.Types      (Addressing, Command, Peer (..),
+                                              Serialize (..), toPeer)
 
 -- | A handle to a UDP socket running the Kademlia connection
 data KademliaHandle i a = KH {
@@ -59,17 +61,25 @@ logError' h = logError h . show
 
 openOn
     :: (Show i, Serialize i, Serialize a)
-    => String -> String -> i -> ReplyQueue i a -> IO (KademliaHandle i a)
-openOn host port id' rq = openOnL host port id' lim rq (const $ pure ()) (const $ pure ())
+    => String -> String -> i -> Addressing -> ReplyQueue i a -> IO (KademliaHandle i a)
+openOn host port id' addressing rq = openOnL host port id' lim addressing rq (const $ pure ()) (const $ pure ())
   where
     lim = msgSizeLimit defaultConfig
 
 -- | Open a Kademlia connection on specified port and return a corresponding
 --   KademliaHandle
-openOnL :: (Show i, Serialize i, Serialize a) => String -> String
-       -> i -> Int -> ReplyQueue i a -> (String -> IO ()) -> (String -> IO ())
-       -> IO (KademliaHandle i a)
-openOnL host port id' lim rq logInfo logError = withSocketsDo $ do
+openOnL
+    :: (Show i, Serialize i, Serialize a)
+    => String
+    -> String
+    -> i
+    -> Int
+    -> Addressing
+    -> ReplyQueue i a
+    -> (String -> IO ())
+    -> (String -> IO ())
+    -> IO (KademliaHandle i a)
+openOnL host port id' lim addressing rq logInfo logError = withSocketsDo $ do
     -- Get addr to bind to
     serveraddrs <- getAddrInfo
                  (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
@@ -85,7 +95,7 @@ openOnL host port id' lim rq logInfo logError = withSocketsDo $ do
     bind sock (addrAddress serveraddr)
 
     chan <- newChan
-    tId <- forkIO $ sendProcessL sock lim id' chan logInfo logError
+    tId <- forkIO $ sendProcessL sock lim addressing id' chan logInfo logError
     mvar <- newEmptyMVar
 
     -- Return the handle
@@ -95,22 +105,22 @@ sendProcessL
     :: (Show i, Serialize i, Serialize a)
     => Socket
     -> Int
+    -> Addressing
     -> i
     -> Chan (Command i a, Peer)
     -> (String -> IO ())
     -> (String -> IO ())
     -> IO ()
-sendProcessL sock lim nid chan logInfo logError =
+sendProcessL sock lim addressing nid chan logInfo logError =
     (withSocketsDo . forever . (`catch` logSomeError') . void $ do
         pair@(cmd, Peer host port) <- readChan chan
 
         logInfo $ "Send process: sending .. " ++ show pair ++ " (id " ++ show nid ++ ")"
         -- Get Peer's address
-        (peeraddr:_) <- getAddrInfo Nothing (Just host)
-                          (Just . show $ port)
+        (peeraddr:_) <- getAddrInfo Nothing (Just host) (Just . show $ port)
 
         -- Send the signal
-        case serialize lim nid cmd of
+        case serialize lim nid cmd addressing of
             Left err   -> logError err
             Right sigs -> forM_ sigs $ \sig -> S.sendTo sock sig (addrAddress peeraddr))
                 -- Close socket on exception (ThreadKilled)
@@ -143,6 +153,8 @@ startRecvProcess kh = do
                     Left _    ->
                       logError kh ("Can't parse " ++ show (BS.length received) ++ " bytes from " ++ show peer)
                     Right sig -> do
+                        -- TODO check whether ip and port in addressing equals peer (in @parse@)
+                        -- Reject Signal if it doesn't
                         logInfo kh ("Received signal " ++ show sig ++ " from " ++ show p)
                         -- Send the signal to the receivng process of instance
                         writeChan (timeoutChan . replyQueue $ kh) $ Answer sig

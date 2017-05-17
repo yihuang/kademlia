@@ -138,6 +138,7 @@ module Network.Kademlia
        , Serialize(..)
        , Node(..)
        , Peer(..)
+       , Addressing (..)
        ) where
 
 import           Network.Kademlia.Config
@@ -145,8 +146,8 @@ import           Network.Kademlia.Implementation as I
 import           Network.Kademlia.Instance
 import           Network.Kademlia.Networking
 import           Network.Kademlia.ReplyQueue
+import qualified Network.Kademlia.Tree           as T
 import           Network.Kademlia.Types
-import qualified Network.Kademlia.Tree as T
 import           Prelude                         hiding (lookup)
 
 -- | Create a new KademliaInstance corresponding to a given Id on a given port
@@ -155,9 +156,10 @@ create
     => String -- ^ Bind host
     -> Int    -- ^ Bind port
     -> i
+    -> Addressing
     -> IO (KademliaInstance i a)
-create host port id' =
-    createL host port id' defaultConfig (const $ pure ()) (const $ pure ())
+create host port id' addressing =
+    createL host port id' addressing defaultConfig (const $ pure ()) (const $ pure ())
 
 -- | Same as create, but with logging
 createL
@@ -165,14 +167,15 @@ createL
     => String -- ^ Bind host
     -> Int    -- ^ Bind port
     -> i
+    -> Addressing
     -> KademliaConfig
     -> (String -> IO ())
     -> (String -> IO ())
     -> IO (KademliaInstance i a)
-createL host port id' cfg logInfo logError = do
+createL host port id' addressing cfg logInfo logError = do
     rq <- emptyReplyQueueL logInfo logError
     let lim = msgSizeLimit cfg
-    h <- openOnL host (show port) id' lim rq logInfo logError
+    h <- openOnL host (show port) id' lim addressing rq logInfo logError
     inst <- newInstance id' cfg h
     inst <$ start inst
 
@@ -181,16 +184,17 @@ createLFromSnapshot
     :: (Show i, Serialize i, Ord i, Serialize a, Eq a)
     => String -- ^ Bind host
     -> Int    -- ^ Bind port
+    -> Addressing
     -> KademliaConfig
     -> KademliaSnapshot i
     -> (String -> IO ())
     -> (String -> IO ())
     -> IO (KademliaInstance i a)
-createLFromSnapshot host port cfg snapshot logInfo logError = do
+createLFromSnapshot host port addressing cfg snapshot logInfo logError = do
     rq <- emptyReplyQueueL logInfo logError
     let lim = msgSizeLimit cfg
     let id' = T.extractId (spTree snapshot) `usingConfig` cfg
-    h <- openOnL host (show port) id' lim rq logInfo logError
+    h <- openOnL host (show port) id' lim addressing rq logInfo logError
     inst <- restoreInstance cfg h snapshot
     inst <$ start inst
 

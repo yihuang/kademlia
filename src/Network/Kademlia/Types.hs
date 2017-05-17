@@ -13,6 +13,7 @@ module Network.Kademlia.Types
        , Peer      (..)
        , Serialize (..)
        , Signal    (..)
+       , Addressing (..)
        , Timestamp
 
        , distance
@@ -96,7 +97,7 @@ fromByteStruct bs = do
               else w
     case fromBS s of
         (Right (converted, _)) -> return converted
-        (Left err) -> error $ "Failed to convert from ByteStruct: " ++ err
+        (Left err)             -> error $ "Failed to convert from ByteStruct: " ++ err
 
 -- Calculate the distance between two Ids, as specified in the Kademlia paper
 distance :: (Serialize i) => i -> i -> WithConfig ByteStruct
@@ -115,8 +116,9 @@ toPeer _ = return Nothing
 
 -- | Representation of a protocl signal
 data Signal i v = Signal {
-      source  :: Node i
-    , command :: Command i v
+      source     :: Node i
+    , command    :: Command i v
+    , addressing :: Addressing
     } deriving (Show, Eq)
 
 -- | Representations of the different protocol commands
@@ -140,3 +142,7 @@ instance Show i => Show (Command i a) where
 
 -- | Amount of seconds since Jan 1, 1970 UTC
 type Timestamp = Int64
+
+data Addressing = Addressing
+    { behindNat :: !Bool
+    } deriving (Show, Eq)
