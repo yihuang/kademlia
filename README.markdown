@@ -31,9 +31,13 @@ To wait for reply on `(reg, replyChan, timeoutTid)` we listen to `replyChan`
 
 2) How incoming requests are dispatched, workers:
   1. Network.Kademlia.Networking.startRcvProcess:
+      ```
         read `(signal, nodeId)` from UDP socket, combine it to reply `reply` (pure operation)
         write `reply` to `timeoutChan`
+        ```
   2. Network.Kademlia.Instance.receivingProcess:
+  
+       ```
         read `reply` from `timeoutChan`
         (`notResponse` || `expectedReply`):
             check either:
@@ -47,6 +51,9 @@ To wait for reply on `(reg, replyChan, timeoutTid)` we listen to `replyChan`
                   write `reply` to `replyChan` // futher it would be handled by thread which sent `signal` and was waiting for reply
             + if there is no registration // note, that this may happen only for requests
                   write `reply` to `defaultChan`
+       ```
   3. Network.Kademlia.Instance.backgraoundProcess:
+       ```
         read `reply` from `defaultChan` //note that only requests can get here
         `handleCommand` for `reply`
+        ```
