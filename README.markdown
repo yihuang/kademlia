@@ -17,7 +17,7 @@ For more information, take a look at the libraries [hackage page][hackage].
 [hackage]: https://hackage.haskell.org/package/kademlia-1.1.0.0
 
 
-== Implementation note (to understand some parts of code) ==
+## Implementation note (to understand some parts of code)
 
 Flow to find nodes by key:
 
