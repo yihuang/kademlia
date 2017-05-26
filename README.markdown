@@ -44,7 +44,9 @@ To wait for reply on `(reg, replyChan, timeoutTid)` we listen to `replyChan`
               * there was a registration `reg` for our `reply`
               * `reply` is a request (not response)
             if call `receivingProcessDo` which calls `dispatch`
+            ```
      Network.Kademlia.ReplyQueue.dispatch:
+     ```
           * we check whether there is registration corresponding to `reply`
             + if there is registrartion `(reg, replyChan, timeoutTid)` then we
                   kill timeout thread by it's id `timeoutTid`
