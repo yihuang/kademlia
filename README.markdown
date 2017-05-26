@@ -44,8 +44,12 @@ To wait for reply on `(reg, replyChan, timeoutTid)` we listen to `replyChan`
               * there was a registration `reg` for our `reply`
               * `reply` is a request (not response)
             if call `receivingProcessDo` which calls `dispatch`
-            ```
+       ```
+     
+     
      Network.Kademlia.ReplyQueue.dispatch:
+     
+     
      ```
           * we check whether there is registration corresponding to `reply`
             + if there is registrartion `(reg, replyChan, timeoutTid)` then we
@@ -53,7 +57,7 @@ To wait for reply on `(reg, replyChan, timeoutTid)` we listen to `replyChan`
                   write `reply` to `replyChan` // futher it would be handled by thread which sent `signal` and was waiting for reply
             + if there is no registration // note, that this may happen only for requests
                   write `reply` to `defaultChan`
-       ```
+     ```
   3. Network.Kademlia.Instance.backgraoundProcess:
        ```
         read `reply` from `defaultChan` //note that only requests can get here
