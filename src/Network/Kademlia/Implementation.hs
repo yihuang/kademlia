@@ -190,7 +190,7 @@ joinNetwork inst peer = ownId >>= runLookup go inst
     continue = waitForReply finish checkSignal
 
     -- Send a FIND_NODE command, looking up your own id
-    sendS toPeer = liftIO ownId >>= flip sendSignal toPeer . FIND_NODE
+    sendS p = liftIO ownId >>= flip sendSignal p . FIND_NODE
 
     -- Return a success, when the operation finished cleanly
     finish = return JoinSuccess
@@ -206,7 +206,7 @@ lookupNode inst nid = runLookup go inst nid
 
     -- Return empty list on lookup failure
     end :: LookupM i a (Maybe (Node i))
-    end = return Nothing
+    end = pure Nothing
 
     -- Check wether the Node we are looking for was found. There are two cases after receiving:
     -- * If we didn't found node then continue lookup
