@@ -35,6 +35,7 @@ library
                        Network.Kademlia.HashNodeId,
                        Network.Kademlia.Implementation
                        Network.Kademlia.Instance
+                       Network.Kademlia.Process
                        Network.Kademlia.Networking
                        Network.Kademlia.Protocol
                        Network.Kademlia.Protocol.Parsing

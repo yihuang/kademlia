@@ -30,7 +30,7 @@ import           Control.Monad          (forM_)
 import           Data.List              (delete, find)
 import           Data.Maybe             (isJust)
 
-import           Network.Kademlia.Types (Command (..), Node (..), Signal (..))
+import           Network.Kademlia.Types (Command (..), Node (..), Peer, Signal (..))
 import           Network.Kademlia.Utils (threadDelay)
 
 -- | The different types a replied signal could possibly have.
@@ -46,7 +46,7 @@ data ReplyType i = R_PONG
 -- | The representation of registered replies
 data ReplyRegistration i = RR {
       replyTypes  :: [ReplyType i]
-    , replyOrigin :: i
+    , replyOrigin :: Peer
     } deriving (Eq, Show)
 
 -- | Convert a Signal into its ReplyRegistration representation
@@ -54,15 +54,16 @@ toRegistration :: Reply i a -> Maybe (ReplyRegistration i)
 toRegistration Closed        = Nothing
 toRegistration (Timeout reg) = Just reg
 toRegistration (Answer sig)  = case rType . command $ sig of
-            Nothing -> Nothing
-            Just rt -> Just (RR [rt] origin)
-    where origin = nodeId $ source sig
+    Nothing -> Nothing
+    Just rt -> Just (RR [rt] origin)
+  where
+    origin = peer $ source sig
 
-          rType :: Command i a -> Maybe (ReplyType i)
-          rType  PONG                  = Just  R_PONG
-          rType (RETURN_VALUE nid _)   = Just (R_RETURN_VALUE nid)
-          rType (RETURN_NODES _ nid _) = Just (R_RETURN_NODES nid)
-          rType _                      = Nothing
+    rType :: Command i a -> Maybe (ReplyType i)
+    rType  PONG                  = Just  R_PONG
+    rType (RETURN_VALUE nid _)   = Just (R_RETURN_VALUE nid)
+    rType (RETURN_NODES _ nid _) = Just (R_RETURN_NODES nid)
+    rType _                      = Nothing
 
 -- | Compare wether two ReplyRegistrations match
 matchRegistrations :: (Eq i) => ReplyRegistration i -> ReplyRegistration i -> Bool
@@ -77,11 +78,16 @@ data Reply i a = Answer (Signal i a)
 
 -- | The actual type representing a ReplyQueue
 data ReplyQueue i a = RQ {
-      queue       :: (TVar [(ReplyRegistration i, Chan (Reply i a), ThreadId)])
-    , timeoutChan :: Chan (Reply i a)
-    , defaultChan :: Chan (Reply i a)
-    , logInfo     :: String -> IO ()
-    , logError    :: String -> IO ()
+      queue        :: (TVar [(ReplyRegistration i, Chan (Reply i a), ThreadId)])
+    -- ^ Queue of expected responses
+    , dispatchChan :: Chan (Reply i a)
+    -- ^ Channel for initial receiving of messages.
+    -- Messages from this channel will be dispatched (via @dispatch@)
+    , requestChan  :: Chan (Reply i a)
+    -- ^ This channels needed for accepting requests from nodes.
+    -- Only request will be processed, reply will be ignored.
+    , logInfo      :: String -> IO ()
+    , logError     :: String -> IO ()
     }
 
 
@@ -117,7 +123,7 @@ timeoutThread reg rq = forkIO $ do
     -- myTId <- myThreadId
 
     -- Send Timeout signal
-    writeChan (timeoutChan rq) . Timeout $ reg
+    writeChan (dispatchChan rq) . Timeout $ reg
 
 -- | Dispatch a reply over a registered handler. If there is no handler,
 --   dispatch it to the default one.
@@ -147,7 +153,7 @@ dispatch reply rq = do
         -- Send the reply over the default channel
         Nothing -> do
             logInfo rq (" -- dispatch reply " ++ show reply ++ ": not in queue")
-            writeChan (defaultChan rq) reply
+            writeChan (requestChan rq) reply
 
     where matches regA (regB, _, _) = matchRegistrations regA regB
 
