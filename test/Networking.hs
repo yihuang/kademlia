@@ -53,7 +53,7 @@ sendCheck cmd = monadicIO $ do
         startRecvProcess khB
 
         send khA pB cmd
-        (Answer sig) <- readChan . timeoutChan $ rqB :: IO (Reply IdType String)
+        (Answer sig) <- readChan . dispatchChan $ rqB :: IO (Reply IdType String)
 
         closeK khA
         closeK khB

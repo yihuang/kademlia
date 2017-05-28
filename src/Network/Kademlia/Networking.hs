@@ -29,17 +29,18 @@ import           Control.Exception           (SomeException, catch, finally)
 import           Control.Monad               (forM_, forever, unless, void)
 import qualified Data.ByteString             as BS
 import           Network.Socket              (AddrInfo (..), AddrInfoFlag (AI_PASSIVE),
-                                              Socket, SocketOption (ReuseAddr),
+                                              Family (..), Socket,
+                                              SocketOption (ReuseAddr),
                                               SocketType (Datagram), addrAddress,
                                               addrFlags, bind, close, defaultHints,
-                                              defaultProtocol, getAddrInfo, Family(..),
+                                              defaultProtocol, getAddrInfo,
                                               setSocketOption, socket, withSocketsDo)
 import qualified Network.Socket.ByteString   as S
 import           System.IO.Error             (ioError, userError)
 
 import           Network.Kademlia.Config     (KademliaConfig (..), defaultConfig)
 import           Network.Kademlia.Protocol   (parse, serialize)
-import           Network.Kademlia.ReplyQueue (Reply (..), ReplyQueue (timeoutChan),
+import           Network.Kademlia.ReplyQueue (Reply (..), ReplyQueue (dispatchChan),
                                               ReplyRegistration, flush, register)
 import           Network.Kademlia.Types      (Command, Peer (..), Serialize (..), toPeer)
 
@@ -145,13 +146,13 @@ startRecvProcess kh = do
                     Right sig -> do
                         logInfo kh ("Received signal " ++ show sig ++ " from " ++ show p)
                         -- Send the signal to the receivng process of instance
-                        writeChan (timeoutChan . replyQueue $ kh) $ Answer sig
+                        writeChan (dispatchChan . replyQueue $ kh) $ Answer sig
                         logInfo kh (" -- added from signal " ++ show p ++ " to chan")
         )
             -- Send Closed reply to all handlers
             `finally` do
                 flush . replyQueue $ kh
-                writeChan (timeoutChan . replyQueue $ kh) Closed
+                writeChan (dispatchChan . replyQueue $ kh) Closed
 
     success <- tryPutMVar (recvThread kh) tId
     unless success . ioError . userError $ "Receiving process already running"

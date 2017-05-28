@@ -51,7 +51,7 @@ import           Network.Kademlia.Config     (KademliaConfig (..), defaultConfig
                                               usingConfig)
 import           Network.Kademlia.Networking (KademliaHandle (..), expect, logError',
                                               send, startRecvProcess)
-import           Network.Kademlia.ReplyQueue (Reply (..), ReplyQueue (timeoutChan),
+import           Network.Kademlia.ReplyQueue (Reply (..), ReplyQueue (dispatchChan),
                                               ReplyRegistration (..), ReplyType (..),
                                               dispatch, expectedReply, requestChan)
 import qualified Network.Kademlia.Tree       as T
@@ -221,7 +221,7 @@ receivingProcess
     -> IO ()
 receivingProcess inst@(KI _ h _ _ _) = forever . (`catch` logError' h) $ do
     let rq = replyQueue h
-    reply <- readChan $ timeoutChan $ replyQueue h
+    reply <- readChan $ dispatchChan $ replyQueue h
     let notResponse = not $ isResponse reply
     whenM ((notResponse ||) <$> expectedReply reply rq) $
         receivingProcessDo inst reply rq

@@ -75,7 +75,7 @@ handlesPingCheck = do
     startRecvProcess khA
 
     send khA pB PING
-    (Answer sig) <- readChan . timeoutChan $ rq :: IO (Reply IdType String)
+    (Answer sig) <- readChan . dispatchChan $ rq :: IO (Reply IdType String)
 
     closeK khA
     close kiB
@@ -105,10 +105,10 @@ storeAndFindValueCheck key value = monadicIO $ do
 
         -- There is a race condition, so the instance will sometimes try to store
         -- the value in the handle, before replying with a RETURN_VALUE
-        (Answer sig) <- readChan . timeoutChan $ rq :: IO (Reply IdType String)
+        (Answer sig) <- readChan . dispatchChan $ rq :: IO (Reply IdType String)
         cmdSig <- case command sig of
                 STORE _ _ -> do
-                    (Answer asig) <- readChan . timeoutChan $ rq :: IO (Reply IdType String)
+                    (Answer asig) <- readChan . dispatchChan $ rq :: IO (Reply IdType String)
                     return asig
                 _ -> return sig
 
@@ -139,7 +139,7 @@ trackingKnownPeersCheck = monadicIO $ do
         startRecvProcess khA
 
         send khA pB $ PING
-        () <$ readChan (timeoutChan rq)
+        () <$ readChan (dispatchChan rq)
 
         node <- lookupNode kiB idA
 
@@ -199,16 +199,16 @@ banNodeCheck = do
     -- if no message received for long enough, put OK message
     void . forkIO $ do
         threadDelay 10000
-        writeChan (timeoutChan rq) Closed
+        writeChan (dispatchChan rq) Closed
 
-    res <- readChan . timeoutChan $ rq :: IO (Reply IdType String)
+    res <- readChan . dispatchChan $ rq :: IO (Reply IdType String)
 
     closeK khA
     close kiB
 
     case res of
         Closed -> return ()
-        _     -> assertFailure "Message from banned node isn't ignored"
+        _      -> assertFailure "Message from banned node isn't ignored"
 
     return ()
 

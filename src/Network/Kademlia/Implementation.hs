@@ -140,7 +140,7 @@ store inst key val = runLookup go inst key
             forM_ storePeers $
                 \storePeer -> liftIO . send h storePeer . STORE key $ val
 
--- | The different possibel results of joinNetwork
+-- | The different possible results of joinNetwork
 data JoinResult
     = JoinSuccess
     | NodeDown
@@ -297,7 +297,7 @@ waitForReplyDo
     -> LookupM i a b
     -> (Signal i a -> LookupM i a b)
     -> LookupM i a b
-waitForReplyDo firstTime cancel onSignal = do
+waitForReplyDo withinJoin cancel onSignal = do
     chan <- gets replyChan
     inst <- gets inst
 
@@ -311,7 +311,7 @@ waitForReplyDo firstTime cancel onSignal = do
                 -- Ignore message from banned node, wait for another message
                 removeFromEverywhere node >> continueIfMorePending
             else do
-                when firstTime $ do
+                when withinJoin $ do
                     polled <- gets polled
                     pending <- gets pending
                     -- Mark the node as polled and pending

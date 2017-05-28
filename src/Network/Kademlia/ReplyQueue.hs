@@ -78,16 +78,16 @@ data Reply i a = Answer (Signal i a)
 
 -- | The actual type representing a ReplyQueue
 data ReplyQueue i a = RQ {
-      queue       :: (TVar [(ReplyRegistration i, Chan (Reply i a), ThreadId)])
+      queue        :: (TVar [(ReplyRegistration i, Chan (Reply i a), ThreadId)])
     -- ^ Queue of expected responses
-    , timeoutChan :: Chan (Reply i a)
+    , dispatchChan :: Chan (Reply i a)
     -- ^ Channel for initial receiving of messages.
     -- Messages from this channel will be dispatched (via @dispatch@)
-    , requestChan :: Chan (Reply i a)
+    , requestChan  :: Chan (Reply i a)
     -- ^ This channels needed for accepting requests from nodes.
     -- Only request will be processed, reply will be ignored.
-    , logInfo     :: String -> IO ()
-    , logError    :: String -> IO ()
+    , logInfo      :: String -> IO ()
+    , logError     :: String -> IO ()
     }
 
 
@@ -123,7 +123,7 @@ timeoutThread reg rq = forkIO $ do
     -- myTId <- myThreadId
 
     -- Send Timeout signal
-    writeChan (timeoutChan rq) . Timeout $ reg
+    writeChan (dispatchChan rq) . Timeout $ reg
 
 -- | Dispatch a reply over a registered handler. If there is no handler,
 --   dispatch it to the default one.
