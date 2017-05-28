@@ -145,6 +145,7 @@ import           Network.Kademlia.Config
 import           Network.Kademlia.Implementation as I
 import           Network.Kademlia.Instance
 import           Network.Kademlia.Networking
+import           Network.Kademlia.Process        (start)
 import           Network.Kademlia.ReplyQueue
 import qualified Network.Kademlia.Tree           as T
 import           Network.Kademlia.Types
