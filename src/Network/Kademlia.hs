@@ -141,6 +141,7 @@ module Network.Kademlia
        , Peer(..)
        ) where
 
+import           Data.Word                       (Word16)
 import           Network.Kademlia.Config
 import           Network.Kademlia.Implementation as I
 import           Network.Kademlia.Instance
@@ -154,46 +155,46 @@ import           Prelude                         hiding (lookup)
 -- | Create a new KademliaInstance corresponding to a given Id on a given port
 create
     :: (Show i, Serialize i, Ord i, Serialize a, Eq a)
-    => String -- ^ Bind host
-    -> Int    -- ^ Bind port
+    => (String, Word16) -- ^ Bind address
+    -> (String, Word16) -- ^ External address
     -> i
     -> IO (KademliaInstance i a)
-create host port id' =
-    createL host port id' defaultConfig (const $ pure ()) (const $ pure ())
+create bindAddr extAddr id' =
+    createL bindAddr extAddr id' defaultConfig (const $ pure ()) (const $ pure ())
 
 -- | Same as create, but with logging
 createL
     :: (Show i, Serialize i, Ord i, Serialize a, Eq a)
-    => String -- ^ Bind host
-    -> Int    -- ^ Bind port
+    => (String, Word16) -- ^ Bind address
+    -> (String, Word16) -- ^ External address
     -> i
     -> KademliaConfig
     -> (String -> IO ())
     -> (String -> IO ())
     -> IO (KademliaInstance i a)
-createL host port id' cfg logInfo logError = do
+createL (host, port) extAddr id' cfg logInfo logError = do
     rq <- emptyReplyQueueL logInfo logError
     let lim = msgSizeLimit cfg
     h <- openOnL host (show port) id' lim rq logInfo logError
-    inst <- newInstance id' cfg h
+    inst <- newInstance id' extAddr cfg h
     inst <$ start inst
 
 -- | Create instance from snapshot with logging
 createLFromSnapshot
     :: (Show i, Serialize i, Ord i, Serialize a, Eq a)
-    => String -- ^ Bind host
-    -> Int    -- ^ Bind port
+    => (String, Word16) -- ^ Bind address
+    -> (String, Word16) -- ^ External address
     -> KademliaConfig
     -> KademliaSnapshot i
     -> (String -> IO ())
     -> (String -> IO ())
     -> IO (KademliaInstance i a)
-createLFromSnapshot host port cfg snapshot logInfo logError = do
+createLFromSnapshot (host, port) extAddr cfg snapshot logInfo logError = do
     rq <- emptyReplyQueueL logInfo logError
     let lim = msgSizeLimit cfg
     let id' = T.extractId (spTree snapshot) `usingConfig` cfg
     h <- openOnL host (show port) id' lim rq logInfo logError
-    inst <- restoreInstance cfg h snapshot
+    inst <- restoreInstance extAddr cfg h snapshot
     inst <$ start inst
 
 -- | Stop a KademliaInstance by closing it
