@@ -51,7 +51,6 @@ import           Network.Kademlia.Networking (KademliaHandle (..))
 import qualified Network.Kademlia.Tree       as T
 import           Network.Kademlia.Types      (Node (..), Peer (..), Serialize (..),
                                               Timestamp)
-import           Network.Socket              (SockAddr (..), getSocketName, inet_ntoa)
 
 -- | The handle of a running Kademlia Node
 data KademliaInstance i a
@@ -91,15 +90,13 @@ instance Binary i => Binary (KademliaSnapshot i)
 -- | Create a new KademliaInstance from an Id and a KademliaHandle
 newInstance
     :: Serialize i
-    => i -> KademliaConfig -> KademliaHandle i a -> IO (KademliaInstance i a)
-newInstance nid cfg handle = do
+    => i -> (String, Int) -> KademliaConfig -> KademliaHandle i a -> IO (KademliaInstance i a)
+newInstance nid (extHost, extPort) cfg handle = do
     tree <- atomically $ newTVar (T.create nid `usingConfig` cfg)
     banned <- atomically . newTVar $ M.empty
     values <- if storeValues cfg then Just <$> (atomically . newTVar $ M.empty) else pure Nothing
     threads <- atomically . newTVar $ M.empty
-    SockAddrInet portnum hostaddr <- getSocketName (kSock handle)
-    host <- inet_ntoa hostaddr
-    let ownNode = Node (Peer host portnum) nid
+    let ownNode = Node (Peer extHost $ fromIntegral extPort) nid
     return $ KI ownNode handle (KS tree banned values) threads cfg
 
 -- | Insert a Node into the NodeTree
@@ -186,16 +183,16 @@ takeSnapshot :: KademliaInstance i a -> IO (KademliaSnapshot i)
 takeSnapshot = takeSnapshot' . state
 
 -- | Restores instance from snapshot.
-restoreInstance :: Serialize i => KademliaConfig -> KademliaHandle i a
+restoreInstance :: Serialize i => (String, Int) -> KademliaConfig -> KademliaHandle i a
                 -> KademliaSnapshot i -> IO (KademliaInstance i a)
-restoreInstance cfg handle snapshot = do
+restoreInstance extAddr cfg handle snapshot = do
     inst <- emptyInstance
     let st = state inst
     atomically . writeTVar (sTree  st) $ spTree snapshot
     atomically . writeTVar (banned st) $ spBanned snapshot
     return inst
   where
-    emptyInstance = newInstance nid cfg handle
+    emptyInstance = newInstance nid extAddr cfg handle
     nid           = T.extractId (spTree snapshot) `usingConfig` cfg
 
 -- | Shows stored buckets, ordered by distance to this node
