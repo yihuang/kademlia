@@ -136,7 +136,7 @@ main = do
     let
         ports     = generatePorts groups
         keys      = evalRand (generateKeys prefixLen groups) (mkStdGen randomSeed)
-        port      = ports !! nodeIndex
+        port      = fromIntegral $ ports !! nodeIndex
         key       = keys !! nodeIndex
         peerPort  = fromIntegral $ ports !! peerIndex
         peerKey   = keys !! peerIndex

@@ -43,6 +43,7 @@ import           Data.Binary                 (Binary)
 import           Data.Map                    (Map)
 import qualified Data.Map                    as M hiding (Map)
 import           Data.Time.Clock.POSIX       (getPOSIXTime)
+import           Data.Word                   (Word16)
 import           GHC.Generics                (Generic)
 
 import           Network.Kademlia.Config     (KademliaConfig, defaultConfig, storeValues,
@@ -90,7 +91,7 @@ instance Binary i => Binary (KademliaSnapshot i)
 -- | Create a new KademliaInstance from an Id and a KademliaHandle
 newInstance
     :: Serialize i
-    => i -> (String, Int) -> KademliaConfig -> KademliaHandle i a -> IO (KademliaInstance i a)
+    => i -> (String, Word16) -> KademliaConfig -> KademliaHandle i a -> IO (KademliaInstance i a)
 newInstance nid (extHost, extPort) cfg handle = do
     tree <- atomically $ newTVar (T.create nid `usingConfig` cfg)
     banned <- atomically . newTVar $ M.empty
@@ -183,7 +184,7 @@ takeSnapshot :: KademliaInstance i a -> IO (KademliaSnapshot i)
 takeSnapshot = takeSnapshot' . state
 
 -- | Restores instance from snapshot.
-restoreInstance :: Serialize i => (String, Int) -> KademliaConfig -> KademliaHandle i a
+restoreInstance :: Serialize i => (String, Word16) -> KademliaConfig -> KademliaHandle i a
                 -> KademliaSnapshot i -> IO (KademliaInstance i a)
 restoreInstance extAddr cfg handle snapshot = do
     inst <- emptyInstance

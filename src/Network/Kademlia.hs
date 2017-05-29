@@ -141,6 +141,7 @@ module Network.Kademlia
        , Peer(..)
        ) where
 
+import           Data.Word                       (Word16)
 import           Network.Kademlia.Config
 import           Network.Kademlia.Implementation as I
 import           Network.Kademlia.Instance
@@ -154,8 +155,8 @@ import           Prelude                         hiding (lookup)
 -- | Create a new KademliaInstance corresponding to a given Id on a given port
 create
     :: (Show i, Serialize i, Ord i, Serialize a, Eq a)
-    => (String, Int) -- ^ Bind address
-    -> (String, Int) -- ^ External address
+    => (String, Word16) -- ^ Bind address
+    -> (String, Word16) -- ^ External address
     -> i
     -> IO (KademliaInstance i a)
 create bindAddr extAddr id' =
@@ -164,8 +165,8 @@ create bindAddr extAddr id' =
 -- | Same as create, but with logging
 createL
     :: (Show i, Serialize i, Ord i, Serialize a, Eq a)
-    => (String, Int) -- ^ Bind address
-    -> (String, Int) -- ^ External address
+    => (String, Word16) -- ^ Bind address
+    -> (String, Word16) -- ^ External address
     -> i
     -> KademliaConfig
     -> (String -> IO ())
@@ -181,8 +182,8 @@ createL (host, port) extAddr id' cfg logInfo logError = do
 -- | Create instance from snapshot with logging
 createLFromSnapshot
     :: (Show i, Serialize i, Ord i, Serialize a, Eq a)
-    => (String, Int) -- ^ Bind address
-    -> (String, Int) -- ^ External address
+    => (String, Word16) -- ^ Bind address
+    -> (String, Word16) -- ^ External address
     -> KademliaConfig
     -> KademliaSnapshot i
     -> (String -> IO ())
