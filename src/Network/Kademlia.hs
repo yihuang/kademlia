@@ -114,8 +114,8 @@ anything to handle this.
 module Network.Kademlia
        ( KademliaInstance
        , node
-       , KademliaConfig(..)
-       , KademliaSnapshot
+       , KademliaConfig (..)
+       , KademliaSnapshot (..)
        , create
        , createL
        , createLFromSnapshot

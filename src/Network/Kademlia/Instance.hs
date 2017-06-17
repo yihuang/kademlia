@@ -39,9 +39,9 @@ import           Control.Monad.Extra         (unlessM)
 import           Control.Monad.Trans         ()
 import           Control.Monad.Trans.Reader  ()
 import           Control.Monad.Trans.State   ()
-import           Data.Binary                 (Binary)
 import           Data.Map                    (Map)
 import qualified Data.Map                    as M hiding (Map)
+import           Data.Store                  (Store)
 import           Data.Time.Clock.POSIX       (getPOSIXTime)
 import           Data.Word                   (Word16)
 import           GHC.Generics                (Generic)
@@ -84,9 +84,9 @@ data KademliaSnapshot i
     , spBanned :: Map Peer BanState
     } deriving (Generic)
 
-instance Binary BanState
+instance Store BanState
 
-instance Binary i => Binary (KademliaSnapshot i)
+instance Store i => Store (KademliaSnapshot i)
 
 -- | Create a new KademliaInstance from an Id and a KademliaHandle
 newInstance
