@@ -29,9 +29,9 @@ import           Prelude                 hiding (lookup)
 
 import           Control.Arrow           (second)
 import           Control.Monad.Random    (evalRand)
-import           Data.Binary             (Binary)
 import qualified Data.List               as L (delete, find, genericTake)
 import qualified Data.Map                as M
+import           Data.Store              (Store)
 import           GHC.Generics            (Generic)
 import           System.Random           (StdGen)
 import           System.Random.Shuffle   (shuffleM)
@@ -65,11 +65,11 @@ type NodeTreeFunction i a
     -> ([(Node i, PingInfo)], [Node i])
     -> WithConfig a
 
-instance Binary PingInfo
+instance Store PingInfo
 
-instance Binary i => Binary (NodeTree i)
+instance Store i => Store (NodeTree i)
 
-instance Binary i => Binary (NodeTreeElem i)
+instance Store i => Store (NodeTreeElem i)
 
 -- | Create a NodeTree corresponding to the id
 create :: (Serialize i) => i -> WithConfig (NodeTree i)

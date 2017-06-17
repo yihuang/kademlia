@@ -22,18 +22,21 @@ module Network.Kademlia.Types
        , toPeer
        ) where
 
-import           Data.Binary             (Binary (..))
-import           Data.Bits               (setBit, testBit, zeroBits)
-import qualified Data.ByteString         as B (ByteString, foldr, pack)
-import           Data.Function           (on)
-import           Data.Int                (Int64)
-import           Data.List               (sortBy)
-import           Data.Word               (Word8)
-import           GHC.Generics            (Generic)
-import           Network.Socket          (PortNumber, SockAddr (..), inet_ntoa)
+import           Data.Bits                  (setBit, testBit, zeroBits)
+import qualified Data.ByteString            as B (ByteString, foldr, pack)
+import           Data.Function              (on)
+import           Data.Functor.Contravariant (contramap)
+import           Data.Int                   (Int64)
+import           Data.List                  (sortBy)
+import           Data.Store                 (Size (..), Store (..))
+import qualified Data.Store.Internal        as Store (getSize)
+import           Data.Word                  (Word16)
+import           Data.Word                  (Word8)
+import           GHC.Generics               (Generic)
+import           Network.Socket             (PortNumber (..), SockAddr (..), inet_ntoa)
 
-import           Network.Kademlia.Config (WithConfig, getConfig)
-import qualified Network.Kademlia.Config as C
+import           Network.Kademlia.Config    (WithConfig, getConfig)
+import qualified Network.Kademlia.Config    as C
 
 -- | Representation of an UDP peer
 data Peer = Peer {
@@ -41,12 +44,18 @@ data Peer = Peer {
     , peerPort :: PortNumber
     } deriving (Eq, Ord, Generic)
 
-instance Show Peer where
-  show (Peer h p) = h ++ ":" ++ show p
+instance Store PortNumber where
+    size = contramap (fromIntegral @_ @Word16) size
+    poke = poke . fromIntegral @_ @Word16
+    peek = fromIntegral @Word16 <$> peek
 
-instance Binary Peer where
-    get = Peer <$> get <*> (toEnum <$> get)
-    put (Peer h p) = put h >> put (fromEnum p)
+instance Show Peer where
+    show (Peer h p) = h ++ ":" ++ show p
+
+instance Store Peer where
+    size = VarSize $ \Peer{..} -> Store.getSize peerHost + Store.getSize peerPort
+    peek = Peer <$> peek <*> (toEnum <$> peek)
+    poke (Peer h p) = poke h >> poke (fromEnum p)
 
 -- | Representation of a Kademlia Node, containing a Peer and an Id
 data Node i = Node {
@@ -57,7 +66,7 @@ data Node i = Node {
 instance Show i => Show (Node i) where
   show (Node peer nodeId) = show peer ++ " (" ++ show nodeId ++ ")"
 
-instance Binary i => Binary (Node i)
+instance Store i => Store (Node i)
 
 -- | Sort a bucket by the closeness of its nodes to a give Id
 sortByDistanceTo :: (Serialize i) => [Node i] -> i -> WithConfig [Node i]
@@ -96,7 +105,7 @@ fromByteStruct bs = do
               else w
     case fromBS s of
         (Right (converted, _)) -> return converted
-        (Left err) -> error $ "Failed to convert from ByteStruct: " ++ err
+        (Left err)             -> error $ "Failed to convert from ByteStruct: " ++ err
 
 -- Calculate the distance between two Ids, as specified in the Kademlia paper
 distance :: (Serialize i) => i -> i -> WithConfig ByteStruct

@@ -4,6 +4,7 @@ packages:
 nix:
   enable: false
   packages: [gmp]
-extra-deps: []
+extra-deps:
+- store-0.4.3.1
 flags: {}
 extra-package-dbs: []
