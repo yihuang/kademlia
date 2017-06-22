@@ -44,18 +44,25 @@ data Peer = Peer {
     , peerPort :: PortNumber
     } deriving (Eq, Ord, Generic)
 
+unwrapPort :: PortNumber -> Word16
+unwrapPort = fromIntegral
+
+wrapPort :: Word16 -> PortNumber
+wrapPort = fromIntegral
+
 instance Store PortNumber where
-    size = contramap (fromIntegral @_ @Word16) size
-    poke = poke . fromIntegral @_ @Word16
-    peek = fromIntegral @Word16 <$> peek
+    size = contramap unwrapPort size
+    poke = poke . unwrapPort
+    peek = wrapPort <$> peek
 
 instance Show Peer where
     show (Peer h p) = h ++ ":" ++ show p
 
 instance Store Peer where
-    size = VarSize $ \Peer{..} -> Store.getSize peerHost + Store.getSize peerPort
-    peek = Peer <$> peek <*> (toEnum <$> peek)
-    poke (Peer h p) = poke h >> poke (fromEnum p)
+    size = VarSize $ \Peer{..} ->
+        Store.getSize peerHost + Store.getSize (unwrapPort peerPort)
+    poke (Peer h p) = poke h >> poke (unwrapPort p)
+    peek = Peer <$> peek <*> (wrapPort <$> peek)
 
 -- | Representation of a Kademlia Node, containing a Peer and an Id
 data Node i = Node {
