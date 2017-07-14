@@ -20,6 +20,8 @@ module Network.Kademlia.Types
        , sortByDistanceTo
        , toByteStruct
        , toPeer
+       , unwrapPort
+       , wrapPort
        ) where
 
 import           Data.Bits                  (setBit, testBit, zeroBits)
