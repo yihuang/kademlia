@@ -12,6 +12,8 @@ This module is designed to be used as a qualified import.
 
 module Network.Kademlia.Tree
        ( NodeTree (..)
+       , NodeTreeElem(..)
+       , PingInfo(..)
        , create
        , insert
        , lookup
