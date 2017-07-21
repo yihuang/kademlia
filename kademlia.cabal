@@ -47,8 +47,6 @@ library
   build-depends:       base                >= 4.7 && < 5
                      , bytestring          >= 0.10.2 && < 0.11
                      , containers          >= 0.5.5.1
-                     , data-default        >= 0.7
-                     , errors
                      , extra               >= 1.4
                      , memory
                      , MonadRandom
@@ -60,7 +58,6 @@ library
                      , store
                      , time                >= 1.6
                      , transformers        >= 0.3
-                     , transformers-compat >= 0.3.3
                      , cryptonite
                      , contravariant
 
