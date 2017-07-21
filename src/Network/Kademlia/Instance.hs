@@ -41,7 +41,6 @@ import           Control.Monad.Trans.Reader  ()
 import           Control.Monad.Trans.State   ()
 import           Data.Map                    (Map)
 import qualified Data.Map                    as M hiding (Map)
-import           Data.Store                  (Store)
 import           Data.Time.Clock.POSIX       (getPOSIXTime)
 import           Data.Word                   (Word16)
 import           GHC.Generics                (Generic)
@@ -83,10 +82,6 @@ data KademliaSnapshot i
       spTree   :: T.NodeTree i
     , spBanned :: Map Peer BanState
     } deriving (Generic)
-
-instance Store BanState
-
-instance Store i => Store (KademliaSnapshot i)
 
 -- | Create a new KademliaInstance from an Id and a KademliaHandle
 newInstance

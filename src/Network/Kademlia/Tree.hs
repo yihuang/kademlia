@@ -33,7 +33,6 @@ import           Control.Arrow           (second)
 import           Control.Monad.Random    (evalRand)
 import qualified Data.List               as L (delete, find, genericTake)
 import qualified Data.Map                as M
-import           Data.Store              (Store)
 import           GHC.Generics            (Generic)
 import           System.Random           (StdGen)
 import           System.Random.Shuffle   (shuffleM)
@@ -66,12 +65,6 @@ type NodeTreeFunction i a
     -> M.Map Peer i
     -> ([(Node i, PingInfo)], [Node i])
     -> WithConfig a
-
-instance Store PingInfo
-
-instance Store i => Store (NodeTree i)
-
-instance Store i => Store (NodeTreeElem i)
 
 -- | Create a NodeTree corresponding to the id
 create :: (Serialize i) => i -> WithConfig (NodeTree i)
