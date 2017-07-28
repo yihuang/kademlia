@@ -55,7 +55,6 @@ library
                      , random
                      , random-shuffle
                      , stm                 >= 2.4.3
-                     , store
                      , time                >= 1.6
                      , transformers        >= 0.3
                      , cryptonite

@@ -30,8 +30,6 @@ import           Data.Function              (on)
 import           Data.Functor.Contravariant (contramap)
 import           Data.Int                   (Int64)
 import           Data.List                  (sortBy)
-import           Data.Store                 (Size (..), Store (..))
-import qualified Data.Store.Internal        as Store (getSize)
 import           Data.Word                  (Word16)
 import           Data.Word                  (Word8)
 import           GHC.Generics               (Generic)
@@ -52,19 +50,8 @@ unwrapPort = fromIntegral
 wrapPort :: Word16 -> PortNumber
 wrapPort = fromIntegral
 
-instance Store PortNumber where
-    size = contramap unwrapPort size
-    poke = poke . unwrapPort
-    peek = wrapPort <$> peek
-
 instance Show Peer where
     show (Peer h p) = h ++ ":" ++ show p
-
-instance Store Peer where
-    size = VarSize $ \Peer{..} ->
-        Store.getSize peerHost + Store.getSize (unwrapPort peerPort)
-    poke (Peer h p) = poke h >> poke (unwrapPort p)
-    peek = Peer <$> peek <*> (wrapPort <$> peek)
 
 -- | Representation of a Kademlia Node, containing a Peer and an Id
 data Node i = Node {
@@ -74,8 +61,6 @@ data Node i = Node {
 
 instance Show i => Show (Node i) where
   show (Node peer nodeId) = show peer ++ " (" ++ show nodeId ++ ")"
-
-instance Store i => Store (Node i)
 
 -- | Sort a bucket by the closeness of its nodes to a give Id
 sortByDistanceTo :: (Serialize i) => [Node i] -> i -> WithConfig [Node i]
